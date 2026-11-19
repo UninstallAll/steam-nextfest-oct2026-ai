@@ -296,6 +296,15 @@ window.addEventListener("keydown", (event) => {
 const response = await fetch("games.jsonl");
 state.games = (await response.text()).trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
 state.message = state.token ? "正在同步打分" : "未登录，只能浏览";
+try {
+  const local = await fetch("ratings/UninstallAll.json");
+  if (local.ok) {
+    const parsed = await local.json();
+    state.sheets.UninstallAll = { scores: parsed.scores || {}, sha: "" };
+  }
+} catch {
+  // 本地没有这份分数时，登录后再从仓库拉。
+}
 render();
 if (state.token) await refreshRatings();
 setInterval(() => { if (state.token) void refreshRatings(); }, 20000);
