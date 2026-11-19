@@ -163,7 +163,8 @@ function flowView(game, total) {
       ${peopleLine(game.app_id)}
       <p>${esc(blurb(game))}</p>
       ${classLine(game)}
-      <p class="source-row"><a href="${esc(game.url)}" target="_blank" rel="noreferrer">打开原始商店页</a></p>
+      <iframe class="steam-widget" src="https://store.steampowered.com/widget/${encodeURIComponent(game.app_id)}/" title="Steam 商店卡片" loading="lazy"></iframe>
+      <p class="source-row"><a href="${esc(game.url)}" target="_blank" rel="noreferrer">打开原始商店页（O）</a></p>
       <p class="muted">${esc(game.url)}</p>
       <p class="disclosure">${esc(game.ai_disclosure || "没有披露原文")}</p>
     </section>
