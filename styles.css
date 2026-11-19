@@ -83,3 +83,4 @@ a { color: var(--focus); }
 }
 .class-line { background: var(--panel); border-radius: 8px; padding: 8px 10px; }
 .source-row a { font-size: 16px; }
+.steam-widget { display: block; width: 100%; max-width: 646px; height: 190px; border: 0; margin: 10px 0 0; }
