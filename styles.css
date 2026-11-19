@@ -83,4 +83,6 @@ a { color: var(--focus); }
 }
 .class-line { background: var(--panel); border-radius: 8px; padding: 8px 10px; }
 .source-row a { font-size: 16px; }
+.genre-line { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; background: #eef3fb; border-radius: 8px; padding: 8px 12px; }
+.genre-line b { color: #4a5a78; font-weight: 600; margin-right: 4px; }
 .steam-widget { display: block; width: 100%; max-width: 646px; height: 190px; border: 0; margin: 10px 0 0; }
