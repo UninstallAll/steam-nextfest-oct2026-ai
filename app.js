@@ -5,6 +5,8 @@ const state = {
   games: [],
   sheets: {},
   labels: {},
+  genres: {},
+  genre: "all",
   me: "",
   token: localStorage.getItem(TOKEN_KEY) || "",
   view: "flow",
@@ -63,6 +65,7 @@ function visible() {
     }
     if (state.filter === "unrated" && mine(game.app_id)) return false;
     if (state.filter === "rated" && allScores(game.app_id).length === 0) return false;
+    if (state.genre !== "all" && state.genres[String(game.app_id)]?.primary_genre !== state.genre) return false;
     return true;
   });
 }
@@ -95,6 +98,10 @@ function render() {
         <option value="all" ${state.filter === "all" ? "selected" : ""}>全部</option>
         <option value="unrated" ${state.filter === "unrated" ? "selected" : ""}>我还没打分</option>
         <option value="rated" ${state.filter === "rated" ? "selected" : ""}>已有人打分</option>
+      </select>
+      <select id="genre" aria-label="主类型">
+        <option value="all">全部类型</option>
+        ${Object.entries(GENRE_NAMES).map(([key, name]) => `<option value="${key}" ${state.genre === key ? "selected" : ""}>${name}（${genreCount(key)}）</option>`).join("")}
       </select>
       <button type="button" id="list" class="${state.view === "list" ? "on" : ""}">列表</button>
       <button type="button" id="flow" class="${state.view === "flow" ? "on" : ""}">翻阅</button>
@@ -148,6 +155,67 @@ function classLine(game) {
   return `<p class="class-line">规则分类：${esc(names[label.primary_class] || label.primary_class)}。这是第一次规则运行的结果，打开原始页可以核对。</p>`;
 }
 
+const GENRE_NAMES = {
+  action: "动作",
+  simulation_management: "模拟与经营",
+  strategy: "策略与战术",
+  casual_idle: "休闲与放置",
+  card_board: "卡牌与桌游",
+  adventure_narrative: "冒险与叙事",
+  horror: "恐怖",
+  rpg: "角色扮演",
+  puzzle: "解谜",
+  sports_racing: "体育与竞速",
+  survival_sandbox: "生存与沙盒",
+  non_game_tool: "工具与教育软件",
+};
+
+const CODE_NAMES = {
+  roguelike: "肉鸽", deckbuilding: "卡组构筑", survival_crafting: "生存合成", building_automation: "建造与自动化",
+  management_economy: "经营与经济", incremental_idle: "放置增长", tower_defense_autobattler: "塔防与自走棋",
+  shooting: "射击", melee_combat: "近战格斗", platforming: "平台跳跃", turn_based: "回合制",
+  real_time_tactics: "即时战术", grand_strategy_4x: "大战略与 4X", branching_narrative: "分支叙事",
+  investigation: "调查推理", exploration_open_world: "探索与开放世界", stealth: "潜行", puzzle_solving: "解谜",
+  physics_destruction: "物理与破坏", collection: "收集", life_romance_sim: "生活与恋爱模拟",
+  job_hobby_sim: "职业与爱好模拟", vehicles: "载具", word_typing_trivia: "文字、打字与问答",
+  rhythm_music: "节奏与音乐", party_social: "派对社交", desktop_companion: "桌面陪伴",
+  procedural_generation: "程序生成", customization_editor: "自定义与编辑器", dungeon_crawl: "地牢探索",
+  gambling_cards: "博彩与棋牌",
+  fantasy: "奇幻", dark_fantasy: "黑暗奇幻", sci_fi_space: "科幻与太空", cyberpunk_dystopia: "赛博朋克与反乌托邦",
+  horror: "恐怖", post_apocalyptic_zombie: "末日与丧尸", historical_military: "历史与军事",
+  mystery_crime: "悬疑与犯罪", cozy_cute: "治愈可爱", comedy: "喜剧", east_asian_myth: "仙侠武侠",
+  mythology: "神话", romance: "恋爱", dark_psychological: "黑暗与心理", ai_as_theme: "以 AI 为题材",
+  modern_everyday: "现代日常", adult: "成人",
+  pixel_art: "像素", anime: "动漫", realistic: "写实", stylized_cartoon: "风格化与卡通", hand_drawn: "手绘",
+  voxel: "体素", minimalist_abstract: "极简与抽象", retro: "复古", cinematic_fmv: "电影化与真人影像",
+  text_only: "纯文字", "2d": "2D", "2_5d": "2.5D", "3d": "3D",
+  first_person: "第一人称", third_person: "第三人称", top_down: "俯视", side_view: "横版", isometric: "等距",
+  vr: "VR",
+  single: "单人", coop: "合作", competitive: "对抗多人", multiplayer: "多人", not_tagged: "标签里没写",
+};
+
+function codeName(code) {
+  return CODE_NAMES[code] || code;
+}
+
+function genreCount(key) {
+  return Object.values(state.genres).filter((row) => row.primary_genre === key).length;
+}
+
+function genreLine(game) {
+  const row = state.genres[String(game.app_id)];
+  if (!row) return "";
+  const part = (label, values) => values?.length ? `<span><b>${label}</b> ${values.map((value) => esc(codeName(value))).join(" · ")}</span>` : "";
+  return `<p class="genre-line">
+    <span><b>类型</b> ${esc(GENRE_NAMES[row.primary_genre] || row.primary_genre)}</span>
+    ${part("玩法", row.mechanics)}
+    ${part("题材", row.theme)}
+    ${part("视觉", [...(row.visual || []), ...(row.dimension || [])])}
+    ${part("视角", row.viewpoint)}
+    <span><b>人数</b> ${esc(codeName(row.player_mode))}</span>
+  </p>`;
+}
+
 function flowView(game, total) {
   if (!game) return `<p class="muted flow">这个筛选下没有游戏。</p>`;
   return `
@@ -162,6 +230,7 @@ function flowView(game, total) {
       ${stars(game.app_id, true)}
       ${peopleLine(game.app_id)}
       <p>${esc(blurb(game))}</p>
+      ${genreLine(game)}
       ${classLine(game)}
       <iframe class="steam-widget" src="https://store.steampowered.com/widget/${encodeURIComponent(game.app_id)}/" title="Steam 商店卡片" loading="lazy"></iframe>
       <p class="source-row"><a href="${esc(game.url)}" target="_blank" rel="noreferrer">打开原始商店页（O）</a></p>
@@ -182,6 +251,12 @@ function bind() {
   document.querySelector("#filter").addEventListener("change", (event) => {
     state.filter = event.target.value;
     state.index = 0;
+    render();
+  });
+  document.querySelector("#genre").addEventListener("change", (event) => {
+    state.genre = event.target.value;
+    state.index = 0;
+    state.listLimit = 80;
     render();
   });
   document.querySelector("#list").addEventListener("click", () => { state.view = "list"; render(); });
@@ -313,7 +388,7 @@ window.addEventListener("keydown", (event) => {
 const response = await fetch("games.jsonl");
 state.games = (await response.text()).trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
 try {
-  const labeled = await fetch("analysis/pass_a_rules.jsonl");
+  const labeled = await fetch("analysis/pass_a_rules.jsonl", { cache: "no-cache" });
   if (labeled.ok) {
     for (const line of (await labeled.text()).trim().split("\n")) {
       if (!line.trim()) continue;
@@ -323,6 +398,18 @@ try {
   }
 } catch {
   // 分类文件还没放在旁边时，翻阅页仍可打开原始商店页。
+}
+try {
+  const genres = await fetch("analysis/genre_a_tags.jsonl", { cache: "no-cache" });
+  if (genres.ok) {
+    for (const line of (await genres.text()).trim().split("\n")) {
+      if (!line.trim()) continue;
+      const row = JSON.parse(line);
+      state.genres[String(row.app_id)] = row;
+    }
+  }
+} catch {
+  // 没有类型分类文件时不显示类型行，也不能按类型筛选。
 }
 state.message = state.token ? "正在同步打分" : "未登录，只能浏览";
 try {
