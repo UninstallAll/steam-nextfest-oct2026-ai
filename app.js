@@ -4,6 +4,7 @@ const TOKEN_KEY = "nextfest-github-token";
 const state = {
   games: [],
   sheets: {},
+  labels: {},
   me: "",
   token: localStorage.getItem(TOKEN_KEY) || "",
   view: "flow",
@@ -135,6 +136,18 @@ function listView(games) {
   `).join("")}${games.length > state.listLimit ? `<button type="button" id="more">继续显示（${state.listLimit} / ${games.length}）</button>` : ""}</div>`;
 }
 
+function classLine(game) {
+  const label = state.labels[String(game.app_id)];
+  if (!label) return "";
+  const names = {
+    runtime_play: "运行时玩法",
+    production_asset: "开发期素材",
+    storefront_only: "仅商店宣传",
+    unspecified: "未能归类",
+  };
+  return `<p class="class-line">规则分类：${esc(names[label.primary_class] || label.primary_class)}。这是第一次规则运行的结果，打开原始页可以核对。</p>`;
+}
+
 function flowView(game, total) {
   if (!game) return `<p class="muted flow">这个筛选下没有游戏。</p>`;
   return `
@@ -149,6 +162,9 @@ function flowView(game, total) {
       ${stars(game.app_id, true)}
       ${peopleLine(game.app_id)}
       <p>${esc(blurb(game))}</p>
+      ${classLine(game)}
+      <p class="source-row"><a href="${esc(game.url)}" target="_blank" rel="noreferrer">打开原始商店页</a></p>
+      <p class="muted">${esc(game.url)}</p>
       <p class="disclosure">${esc(game.ai_disclosure || "没有披露原文")}</p>
     </section>
   `;
@@ -295,6 +311,18 @@ window.addEventListener("keydown", (event) => {
 
 const response = await fetch("games.jsonl");
 state.games = (await response.text()).trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+try {
+  const labeled = await fetch("analysis/pass_a_rules.jsonl");
+  if (labeled.ok) {
+    for (const line of (await labeled.text()).trim().split("\n")) {
+      if (!line.trim()) continue;
+      const row = JSON.parse(line);
+      state.labels[String(row.app_id)] = row;
+    }
+  }
+} catch {
+  // 分类文件还没放在旁边时，翻阅页仍可打开原始商店页。
+}
 state.message = state.token ? "正在同步打分" : "未登录，只能浏览";
 try {
   const local = await fetch("ratings/UninstallAll.json");
