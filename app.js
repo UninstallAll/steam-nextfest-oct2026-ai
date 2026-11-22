@@ -5,6 +5,10 @@ const MUTE_KEY = "nextfest-muted";
 const AUTOPLAY_KEY = "nextfest-autoplay";
 const CHUNK = 50;
 const HLS_URL = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.mjs";
+const ZH_KEY = "nextfest-zh";
+const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t";
+const TRANSLATE_LIMIT = 4500;
+const BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, td, blockquote";
 
 const state = {
   games: [],
@@ -23,6 +27,7 @@ const state = {
   index: 0,
   mediaIndex: 0,
   autoplay: localStorage.getItem(AUTOPLAY_KEY) === "1",
+  zh: localStorage.getItem(ZH_KEY) === "1",
   message: "正在读取游戏",
   showToken: false,
 };
@@ -204,6 +209,155 @@ function cleanAbout(html) {
   return doc.body.innerHTML;
 }
 
+const translated = new Map();
+
+async function translateOne(text) {
+  const source = text.trim();
+  if (!source || !/\p{L}/u.test(source) || /^[\s\p{Script=Han}\p{P}\d]+$/u.test(source)) return text;
+  if (translated.has(source)) return translated.get(source);
+  const pieces = [];
+  let rest = source;
+  while (rest.length > TRANSLATE_LIMIT) {
+    const cut = Math.max(rest.lastIndexOf(". ", TRANSLATE_LIMIT), rest.lastIndexOf("\n", TRANSLATE_LIMIT), TRANSLATE_LIMIT / 2);
+    pieces.push(rest.slice(0, cut + 1));
+    rest = rest.slice(cut + 1);
+  }
+  pieces.push(rest);
+  const out = [];
+  for (const piece of pieces) {
+    const response = await fetch(TRANSLATE_URL, { method: "POST", body: new URLSearchParams({ q: piece }) });
+    if (!response.ok) throw new Error(`翻译接口返回 ${response.status}`);
+    const data = await response.json();
+    out.push((data[0] || []).map((sentence) => sentence[0] || "").join(""));
+  }
+  const result = out.join("");
+  translated.set(source, result);
+  return result;
+}
+
+async function translateAll(texts) {
+  const results = new Array(texts.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < texts.length) {
+      const index = next++;
+      results[index] = await translateOne(texts[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, texts.length) }, worker));
+  return results;
+}
+
+function cachedTranslation(appId) {
+  try {
+    return JSON.parse(localStorage.getItem(`zh:${appId}`) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function storeTranslation(appId, value) {
+  try {
+    localStorage.setItem(`zh:${appId}`, JSON.stringify(value));
+  } catch {
+    // 浏览器存储满了就只留在内存里。
+  }
+}
+
+function aboutTargets(about) {
+  const leaves = [...about.querySelectorAll(BLOCKS)].filter((node) => !node.querySelector(BLOCKS) && node.textContent.trim());
+  const targets = [];
+  for (const leaf of leaves) {
+    if (leaf.querySelector("img, video")) {
+      const walker = document.createTreeWalker(leaf, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) if (walker.currentNode.textContent.trim()) targets.push(walker.currentNode);
+    } else {
+      targets.push(leaf);
+    }
+  }
+  const walker = document.createTreeWalker(about, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.textContent.trim() && !node.parentElement?.closest(BLOCKS)) targets.push(node);
+  }
+  return targets;
+}
+
+const building = new Map();
+
+function buildTranslation(game, targets) {
+  const appId = String(game.app_id);
+  if (!building.has(appId)) {
+    const sources = [blurb(game), game.ai_disclosure || "", ...targets.map((node) => node.textContent)];
+    building.set(appId, translateAll(sources).then((results) => {
+      const value = { short: results[0], disclosure: results[1], about: results.slice(2) };
+      storeTranslation(appId, value);
+      return value;
+    }).finally(() => building.delete(appId)));
+  }
+  return building.get(appId);
+}
+
+function pretranslate(game) {
+  const media = state.media[String(game.app_id)];
+  if (!state.zh || !media) return;
+  const holder = document.createElement("template");
+  holder.innerHTML = aboutHtml(game);
+  const targets = aboutTargets(holder.content);
+  const cached = cachedTranslation(game.app_id);
+  if (cached && cached.about?.length === targets.length) return;
+  buildTranslation(game, targets).catch(() => {});
+}
+
+function setZhButton(text) {
+  const button = document.querySelector("#zh");
+  if (button) button.textContent = text;
+}
+
+async function applyTranslation(game) {
+  const appId = String(game.app_id);
+  const about = document.querySelector("#about");
+  const short = document.querySelector(".short");
+  const disclosure = document.querySelector(".disclosure");
+  if (!about || !short || !disclosure || !state.media[appId]) return;
+  const targets = aboutTargets(about);
+  let value = cachedTranslation(appId);
+  if (!value || value.about?.length !== targets.length) {
+    setZhButton("翻译中…");
+    try {
+      value = await buildTranslation(game, targets);
+    } catch (error) {
+      if (visible()[state.index] === game) setZhButton(`翻译失败，再按 T 重试（${error.message}）`);
+      return;
+    }
+  }
+  if (visible()[state.index] !== game || !state.zh) return;
+  short.textContent = value.short;
+  disclosure.innerHTML = highlight(value.disclosure);
+  targets.forEach((node, index) => {
+    if (value.about[index] != null) node.textContent = value.about[index];
+  });
+  setZhButton("显示原文（T）");
+}
+
+function showOriginal(game) {
+  const short = document.querySelector(".short");
+  const disclosure = document.querySelector(".disclosure");
+  if (short) short.textContent = blurb(game);
+  if (disclosure) disclosure.innerHTML = highlight(game.ai_disclosure || "没有披露原文");
+  renderAbout(game);
+  setZhButton("翻译成中文（T）");
+}
+
+function toggleZh() {
+  const game = visible()[state.index];
+  state.zh = !state.zh;
+  localStorage.setItem(ZH_KEY, state.zh ? "1" : "0");
+  if (!game) return;
+  if (state.zh) void applyTranslation(game);
+  else showOriginal(game);
+}
+
 function chunkOf(game) {
   return Math.floor(game._i / CHUNK);
 }
@@ -253,6 +407,7 @@ function prefetchAround() {
       const items = mediaItems(game);
       const firstImage = items.find((item) => item.kind === "image");
       if (offset <= 2) warm(items[0].kind === "video" ? items[0].thumb : firstImage?.full);
+      if (offset === 1 || offset === 2) pretranslate(game);
       items.slice(0, 8).forEach((item) => warm(item.thumb));
     });
   }
@@ -326,10 +481,13 @@ function renderBody() {
       if (pending) {
         renderStage(game);
         renderAbout(game);
+        if (state.zh) void applyTranslation(game);
       }
       prefetchAround();
     });
     renderStage(game);
+    document.querySelector("#zh")?.addEventListener("click", toggleZh);
+    if (state.zh && !pending) void applyTranslation(game);
   }
 }
 
@@ -379,12 +537,15 @@ function flowView(game, total) {
       <div class="stage-col">
         <div class="stage" id="stage"></div>
         <div class="strip" id="strip"></div>
-        <p class="muted keys">← → 换游戏 · ↑ ↓ 换画面 · V 播放或暂停 · F 全屏 · 1–5 打分 · 0 清除 · O 打开商店页</p>
+        <p class="muted keys">← → 换游戏 · ↑ ↓ 换画面 · V 播放或暂停 · F 全屏 · T 中文 · 1–5 打分 · 0 清除 · O 打开商店页</p>
       </div>
       <aside class="info">
         <div class="info-head">
           <span class="muted">${state.index + 1} / ${total}</span>
-          <a href="${esc(game.url)}" target="_blank" rel="noreferrer">打开原始商店页（O）</a>
+          <span class="head-actions">
+            <button type="button" id="zh">${state.zh ? "显示原文（T）" : "翻译成中文（T）"}</button>
+            <a href="${esc(game.url)}" target="_blank" rel="noreferrer">打开原始商店页（O）</a>
+          </span>
         </div>
         <h2>${esc(game.title)}</h2>
         <p class="muted">${esc((game.developers || []).join("、") || "开发商未知")}${(game.publishers || []).length && (game.publishers || []).join() !== (game.developers || []).join() ? ` · 发行 ${esc(game.publishers.join("、"))}` : ""}</p>
@@ -675,6 +836,7 @@ window.addEventListener("keydown", (event) => {
   else if (key === "ArrowDown") stepMedia(1);
   else if (key === "ArrowUp") stepMedia(-1);
   else if (key === "v" || key === "V" || key === " ") void playVideo();
+  else if (key === "t" || key === "T") toggleZh();
   else if (key === "f" || key === "F") {
     const stage = document.querySelector("#stage");
     if (document.fullscreenElement) void document.exitFullscreen();
