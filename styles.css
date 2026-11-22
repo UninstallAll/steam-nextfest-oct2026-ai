@@ -118,7 +118,9 @@ html, body { height: 100%; }
 .info h2 { margin: 6px 0 2px; font-size: 22px; }
 .info h3 { font-size: 13px; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
 .info p { margin: 6px 0; }
-.info-head { display: flex; justify-content: space-between; align-items: center; }
+.info-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.head-actions { display: flex; align-items: center; gap: 10px; }
+#zh { border: 0; background: var(--focus); color: white; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
 .facts { font-size: 14px; }
 .tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .tags span { font-size: 12px; background: white; border-radius: 6px; padding: 2px 7px; }
