@@ -46,7 +46,7 @@ button.on { outline: 2px solid var(--focus); }
   padding: 8px;
   margin-bottom: 8px;
 }
-.card img, .flow img { width: 100%; display: block; object-fit: cover; background: #d5dbe2; }
+.card img { width: 100%; display: block; object-fit: cover; background: #d5dbe2; }
 .card img { height: 92px; border-radius: 8px; }
 .title { font-size: 16px; }
 .blurb, .disclosure {
@@ -70,9 +70,71 @@ button.on { outline: 2px solid var(--focus); }
   padding: 0 2px;
 }
 .stars button.on { color: #e8b931; }
-.flow { max-width: 880px; margin: 0 auto; padding: 20px 24px 48px; }
-.flow img { max-height: 440px; }
-.flow-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 18px;
+  height: 100%;
+  padding: 14px 18px;
+}
+html, body { height: 100%; }
+#app { height: 100%; display: flex; flex-direction: column; }
+#app > header, #token-box { flex: none; }
+#body { flex: 1; min-height: 0; overflow-y: auto; }
+.flow-empty { padding: 24px; }
+.stage-col { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #111418;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.stage img, .stage video { width: 100%; height: 100%; object-fit: contain; display: block; background: #111418; }
+.stage-label { position: absolute; left: 10px; top: 8px; color: #fff; font-size: 12px; background: rgba(0, 0, 0, 0.5); padding: 2px 8px; border-radius: 6px; pointer-events: none; }
+.play-overlay {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 28px;
+  cursor: pointer;
+}
+.stage-error { position: absolute; bottom: 48px; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 6px 10px; border-radius: 6px; }
+.strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; align-items: center; flex: none; }
+.thumb { flex: none; width: 116px; height: 66px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #d5dbe2; cursor: pointer; position: relative; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb.on { border-color: var(--focus); }
+.thumb.video::after { content: "▶"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 20px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+.strip-count { flex: none; padding: 0 6px; }
+.keys { margin: 0; flex: none; }
+.info { overflow-y: auto; min-height: 0; background: var(--panel); border-radius: 10px; padding: 14px 16px 32px; }
+.info h2 { margin: 6px 0 2px; font-size: 22px; }
+.info h3 { font-size: 13px; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
+.info p { margin: 6px 0; }
+.info-head { display: flex; justify-content: space-between; align-items: center; }
+.facts { font-size: 14px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tags span { font-size: 12px; background: white; border-radius: 6px; padding: 2px 7px; }
+.short { font-size: 14px; line-height: 1.5; }
+.about { font-size: 13px; line-height: 1.55; }
+.about img { max-width: 100%; height: auto; border-radius: 6px; }
+.about ul { padding-left: 20px; }
+.about h2 { font-size: 15px; }
+mark { background: #ffe9a8; border-radius: 3px; padding: 0 2px; }
+mark.hot { background: #ffc4bd; }
+.check { display: flex; align-items: center; gap: 4px; }
+.rate-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .flow { grid-template-columns: 1fr; height: auto; }
+  .stage { aspect-ratio: 16 / 9; flex: none; }
+}
 a { color: var(--focus); }
 .token {
   margin: 12px auto;
@@ -85,4 +147,3 @@ a { color: var(--focus); }
 .source-row a { font-size: 16px; }
 .genre-line { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; background: #eef3fb; border-radius: 8px; padding: 8px 12px; }
 .genre-line b { color: #4a5a78; font-weight: 600; margin-right: 4px; }
-.steam-widget { display: block; width: 100%; max-width: 646px; height: 190px; border: 0; margin: 10px 0 0; }
